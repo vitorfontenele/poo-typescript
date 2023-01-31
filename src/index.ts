@@ -62,7 +62,6 @@ app.get("/videos", async (req: Request, res: Response) => {
     }
 });
 
-
 // Create video
 app.post("/videos", async (req: Request, res: Response) => {
     try {
@@ -258,7 +257,6 @@ app.delete("/videos/:id", async (req: Request, res: Response) => {
         }
     }
 });
-
 
 app.listen(3003, () => {
     console.log("Servidor rodando!");
