@@ -1,8 +1,9 @@
 import express, {Request, Response} from 'express';
 import cors from 'cors';
-import { db } from "./database/knex";
+// import { db } from "./database/BaseDatabase";
 import { TVideoDB } from './types';
 import { Video } from './models/Video';
+import { VideoDatabase } from './database/VideoDatabase';
 
 // Configurando a instância do express
 const app = express();
@@ -31,17 +32,10 @@ app.get("/ping", async (req: Request, res: Response) => {
 // Get all videos
 app.get("/videos", async (req: Request, res: Response) => {
     try {
-        const q = req.query.q;
-
-        let videosDB;
-
-        if (q) {
-            const result: TVideoDB[] = await db("videos").where("title", "LIKE", `%${q}%`);
-            videosDB = result;
-        } else {
-            const result: TVideoDB[] = await db("videos");
-            videosDB = result;
-        }
+        const q = req.query.q as string | undefined;
+        const videoDatabase = new VideoDatabase();
+        // const result: TVideoDB[] = await db("videos").where("title", "LIKE", `%${q}%`);
+        const videosDB = await videoDatabase.findVideos(q);
 
         const videosToDisplay = videosDB.map(video => 
             new Video(
@@ -66,7 +60,8 @@ app.get("/videos", async (req: Request, res: Response) => {
             res.send("Erro inesperado")
         }
     }
-})
+});
+
 
 // Create video
 app.post("/videos", async (req: Request, res: Response) => {
@@ -78,7 +73,9 @@ app.post("/videos", async (req: Request, res: Response) => {
             throw new Error("'id' deve ser string")
         }
 
-        const [ videoDBExists ]: TVideoDB[] | undefined[] = await db("videos").where({ id })
+        // const [ videoDBExists ]: TVideoDB[] | undefined[] = await db("videos").where({ id })
+        const videoDatabase = new VideoDatabase();
+        const videoDBExists = await videoDatabase.findVideoById(id);
 
         if (videoDBExists) {
             res.status(400)
@@ -108,7 +105,8 @@ app.post("/videos", async (req: Request, res: Response) => {
             uploaded_at: newVideo.getUploadedAt()
         };     
 
-        await db("videos").insert(newVideoToInsert);
+        // await db("videos").insert(newVideoToInsert);
+        await videoDatabase.insertVideo(newVideoToInsert);
 
         res.status(201).send({
             message: "Vídeo criado com sucesso",
@@ -127,7 +125,7 @@ app.post("/videos", async (req: Request, res: Response) => {
             res.send("Erro inesperado")
         }
     }
-})
+});
 
 // Edit video
 app.put("/videos/:id", async (req: Request, res: Response) => {
@@ -137,13 +135,17 @@ app.put("/videos/:id", async (req: Request, res: Response) => {
         const newTitle = req.body.title;
         const newDuration = req.body.duration;
 
+        // Definir fora dos if's
+        const videoDatabase = new VideoDatabase();
+
         if (newId !== undefined){
             if (typeof newId !== "string") {
                 res.status(400);
                 throw new Error("'id' deve ser string");
             }
     
-            const [ videoDBExists ]: TVideoDB[] | undefined[] = await db("videos").where({ id: newId });
+            // const [ videoDBExists ]: TVideoDB[] | undefined[] = await db("videos").where({ id: newId });
+            const videoDBExists = await videoDatabase.findVideoById(newId);
     
             if (videoDBExists) {
                 res.status(400)
@@ -169,7 +171,8 @@ app.put("/videos/:id", async (req: Request, res: Response) => {
             }
         }
 
-        const [ videoInDB ]: TVideoDB[] | undefined[] = await db("videos").where({ id: idToEdit });
+        // const [ videoInDB ]: TVideoDB[] | undefined[] = await db("videos").where({ id: idToEdit });
+        const videoInDB = await videoDatabase.findVideoById(idToEdit);
 
         if (!videoInDB) {
             res.status(404)
@@ -190,7 +193,8 @@ app.put("/videos/:id", async (req: Request, res: Response) => {
             uploaded_at: updatedVideo.getUploadedAt()
         };
 
-        await db("videos").update(updatedVideoToInsert).where({ id: idToEdit });
+        // await db("videos").update(updatedVideoToInsert).where({ id: idToEdit });
+        await videoDatabase.updateVideo(idToEdit, updatedVideoToInsert);
         
         res.status(200).send({
             message: "Vídeo editado com sucesso",
@@ -209,14 +213,16 @@ app.put("/videos/:id", async (req: Request, res: Response) => {
             res.send("Erro inesperado")
         }
     }
-})
+});
 
 // Delete video
 app.delete("/videos/:id", async (req: Request, res: Response) => {
     try {
         const id = req.params.id;
 
-        const [ videoInDB ] : TVideoDB[] | undefined[] = await db("videos").where({ id });
+        // const [ videoInDB ] : TVideoDB[] | undefined[] = await db("videos").where({ id });
+        const videoDatabase = new VideoDatabase();
+        const videoInDB = await videoDatabase.findVideoById(id);
         if (!videoInDB){
             res.status(404);
             throw new Error ("Vídeo não encontrado");
@@ -229,7 +235,8 @@ app.delete("/videos/:id", async (req: Request, res: Response) => {
             videoInDB.uploaded_at
         );
 
-        await db("videos").del().where({ id });
+        // await db("videos").del().where({ id });
+        await videoDatabase.deleteVideo(id);
 
         res.status(200).send({
             message: "Vídeo deletado com sucesso",
@@ -250,7 +257,8 @@ app.delete("/videos/:id", async (req: Request, res: Response) => {
             res.send("Erro inesperado")
         }
     }
-})
+});
+
 
 app.listen(3003, () => {
     console.log("Servidor rodando!");
